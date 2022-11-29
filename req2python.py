@@ -157,6 +157,7 @@ else:
     requests_method = f'request'
     requests_args = f'method="{method}",\n    ' + requests_args
 
+
 shebang = ""
 if args.write_shebang:
     shebang += f"#!/usr/bin/env python3\n"
@@ -175,7 +176,7 @@ args = parser.parse_args()
 """
     shebang += f"{args.session_variable} = requests.session()\n"
 
-
+url_from_stdin = ""
 if args.make_url_stdin:
     url_from_stdin += "url = args.url"
 # else:
