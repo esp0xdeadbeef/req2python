@@ -91,6 +91,12 @@ parser.add_argument(
     default=True,
     help='Remove content length (default: %(default)s)'
 )
+# parser.add_argument(
+#     '-make-url-stdin', 
+#     action='store_false', 
+#     default=True,
+#     help='Remove content length (default: %(default)s)'
+# )
 
 args = parser.parse_args()
 method, url, headers, data, method_row = parse_request(args.infile)
@@ -123,36 +129,54 @@ if args.pretty_json:
         data_pretty = data
         json_data_type = False
 
-ret_val = b""
+ret_val = ""
 if args.write_shebang:
-    ret_val += b"#!/usr/bin/env python3\n"
-    ret_val += b"import requests\n\n"
-    ret_val += f"{session_variable} = requests.session()\n".encode('latin-1')
+    ret_val += f"#!/usr/bin/env python3\n"
+    ret_val += f"import requests\n\n"
+    ret_val += f"{session_variable} = requests.session()\n"
     
 ret_val += f"""try:
     from http.client import HTTPConnection
     HTTPConnection._http_vsn_str = "{method_row[-1]}"
 except KeyError:
     pass
-""".encode('latin-1')
-ret_val += f"headers = {headers_pretty!s}\n".encode('latin-1')
-ret_val += f"data = {data_pretty!s}".encode('latin-1')
-ret_val += f"\nurl = '{url}'\n".encode('latin-1')
+"""
+
+
+ret_val += f"headers = {headers_pretty!s}\n"
+ret_val += f"data = {data_pretty!s}\n"
+ret_val += f"url = '{url}'\n"
 
 requests_methods = []
 with open(sysconfig.get_paths()["purelib"] + "/requests/api.py", 'r') as f:
     for i in f.readlines():
         if 'def ' in i and not 'request(' in i:
             requests_methods.append(i.split('def ', 1)[-1].split('(',1)[0])
-            
-if json_data_type:       
-    data_type = "json=data"
-else:
-    data_type = "data=data"
+
 if method.lower() in requests_methods:
-    ret_val += f'''{response_var} = {session_variable}.{method.lower()}(\n{tabs * 1!s}url=url, \n{tabs * 1!s}headers=headers,\n{tabs * 1!s}{data_type},\n)'''.encode('latin-1')
+    ret_val += f'{response_var} = {session_variable}.{method.lower()}(\n'
 else:
-    ret_val += f'''{response_var} = {session_variable}.request(\n{tabs * 1!s}method="{method}",\n{tabs * 1!s}url=url, \n{tabs * 1!s}headers=headers,\n{tabs * 1!s}{data_type},\n)'''.encode('latin-1')
+    ret_val += f'{response_var} = {session_variable}.request(\n'
+    ret_val += f'{tabs * 1!s}method="{method}",\n'
+    
+ret_val += f"{tabs * 1!s}url=url, \n"
+ret_val += f"{tabs * 1!s}headers=headers,\n"
+
+if json_data_type:       
+    ret_val += f"{tabs * 1!s}json=data,\n"
+else:
+    ret_val += f"{tabs * 1!s}data=data,\n"
+
+ret_val += f"{tabs * 1!s}" + "# proxies={\n"
+ret_val += f"{tabs * 1!s}" + "#" + f"{tabs * 1!s}" + " 'http': 'http://127.0.0.1:8080'\n"
+ret_val += f"{tabs * 1!s}" + "# },\n"
+ret_val += f"{tabs * 1!s}# allow_redirects = False,\n"
+ret_val += f")"
+# if args.make_url_stdin:
+#     ret_val = ret_val.replace(url, 'url')
+
+ret_val = ret_val.encode('latin-1')
+
 ret_val += b"\nprint(r.text)\n"
 
 
