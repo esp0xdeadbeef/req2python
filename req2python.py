@@ -35,7 +35,7 @@ def parse_request(infile_object):
     for potential_proto_header in potential_proto_headers:
         try:
             if headers[potential_proto_header].split(':',1)[0] != args.request_proto:
-                print('# I think you have the wrong request-proto filled in, but hey let\'s go.')
+                print('print("# I think you have the wrong request-proto filled in, but hey let\'s go.")')
         except KeyError:
             pass
     
@@ -98,7 +98,7 @@ parser.add_argument(
     help='Remove content length (default: %(default)s)'
 )
 parser.add_argument(
-    '-make-url-stdin', 
+    '-make-url-argparse', 
     action='store_true', 
     default=False,
     help='Remove content length (default: %(default)s)'
@@ -162,8 +162,9 @@ shebang = ""
 if args.write_shebang:
     shebang += f"#!/usr/bin/env python3\n"
     shebang += f"import requests\n"
-    if args.make_url_stdin:
-        url_from_stdin = f"""import argparse
+    shebang += f"{args.session_variable} = requests.session()\n"
+if args.make_url_argparse:
+    url_from_argparse = f"""import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument(
     '-url',
@@ -172,23 +173,13 @@ parser.add_argument(
     help='Request result variable (default: %(default)s)'
 )
 args = parser.parse_args()
-
+url = args.url
 """
-    shebang += f"{args.session_variable} = requests.session()\n"
-
-url_from_stdin = ""
-if args.make_url_stdin:
-    url_from_stdin += "url = args.url"
-# else:
-#     url_from_stdin += f"url = '{url}'"
-
-# if args.make_url_stdin:
-#     url = ""
-# else:
-
+else:
+    url_from_argparse = f"url = '{url}'\n"
 
 template_for_request_python3 = Template("""$shebang
-$url_from_stdin
+$url_from_argparse
 try:
     from http.client import HTTPConnection
     HTTPConnection._http_vsn_str = "$http_vsn_str"
@@ -208,7 +199,7 @@ url = f"'{url}'"
 
 variables = {
     'shebang': shebang,
-    'url_from_stdin': url_from_stdin,
+    'url_from_argparse': url_from_argparse,
     'http_vsn_str': http_vsn_str,
     'headers': headers_pretty,
     'data': data_pretty,
