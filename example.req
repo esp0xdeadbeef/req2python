@@ -1,5 +1,6 @@
 GET /testing HTTP/1.1
-Host: localhost:8080
+Host: localhost:8000
+Referer: http://localhost
 User-Agent: curl/7.86.0
 Accept: */*
 
