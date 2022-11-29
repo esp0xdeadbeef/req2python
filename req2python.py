@@ -32,14 +32,16 @@ def parse_request(infile_object):
         url = path
     
     potential_proto_headers = ['Referer', 'Origin']
+    alert_request_proto = False
     for potential_proto_header in potential_proto_headers:
         try:
             if headers[potential_proto_header].split(':',1)[0] != args.request_proto:
-                print('print("# I think you have the wrong request-proto filled in, but hey let\'s go.")')
+                alert_request_proto = True
+                break
         except KeyError:
             pass
     
-    return method, url, headers, data, path, http_vsn_str
+    return method, url, headers, data, path, http_vsn_str, alert_request_proto
 
 
 parser = argparse.ArgumentParser()
@@ -105,7 +107,7 @@ parser.add_argument(
 )
 
 args = parser.parse_args()
-method, url, headers, data, path, http_vsn_str = parse_request(args.infile)
+method, url, headers, data, path, http_vsn_str, alert_request_proto = parse_request(args.infile)
 
 
 
@@ -127,9 +129,6 @@ requests_args = """url=url,
     # },
     # "allow_redirects"=False,""" 
 
-headers_pretty = headers
-data_pretty = data
-json_data_type = False
 
 if args.unpretty_json:
     try:
@@ -160,9 +159,10 @@ else:
 
 shebang = ""
 if args.write_shebang:
-    shebang += f"#!/usr/bin/env python3\n"
-    shebang += f"import requests\n"
-    shebang += f"{args.session_variable} = requests.session()\n"
+    shebang += f"""#!/usr/bin/env python3"
+import requests
+{args.session_variable} = requests.session()
+"""
 if args.make_url_argparse:
     url_from_argparse = f"""import argparse
 parser = argparse.ArgumentParser()
@@ -177,6 +177,8 @@ url = args.url
 """
 else:
     url_from_argparse = f"url = '{url}'\n"
+    if alert_request_proto:
+        url_from_argparse += "print('The url is probably a different prototype then the official service.')\n"
 
 template_for_request_python3 = Template("""$shebang
 $url_from_argparse
