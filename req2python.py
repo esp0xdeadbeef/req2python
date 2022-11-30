@@ -76,6 +76,12 @@ parser.add_argument(
     help='Session variable (default: %(default)s)'
 )
 parser.add_argument(
+    '-proxy-variable', 
+    type=str, 
+    default="http://127.0.0.1:8080",
+    help='Proxy variable in output (default: %(default)s)'
+)
+parser.add_argument(
     '-response-var',
     type=str, 
     default="r",
@@ -121,14 +127,18 @@ for i in ['Content-Length', 'content-length']:
         pass
 
 
-requests_args = """url=url, 
+
+requests_args = Template("""url=url, 
     headers=headers,
     data=data,
     # proxies={
-    #    'http': 'http://127.0.0.1:8080'
+    #    'http': '$proxy_variable'
     # },
-    # "allow_redirects"=False,""" 
-
+    # allow_redirects=False,""")
+a = {
+    "proxy_variable": args.proxy_variable
+}
+requests_args = str(requests_args.substitute(a))
 
 if args.pretty_json:
     try:
