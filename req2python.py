@@ -82,7 +82,7 @@ parser.add_argument(
     help='Request result variable (default: %(default)s)'
 )
 parser.add_argument(
-    '-unpretty-json', 
+    '-pretty-json', 
     action='store_false', 
     default=True,
     help='Make the json pretty (default: %(default)s)'
@@ -130,7 +130,7 @@ requests_args = """url=url,
     # "allow_redirects"=False,""" 
 
 
-if args.unpretty_json:
+if args.pretty_json:
     try:
         headers_pretty = json.dumps(headers, indent=4, sort_keys=False).replace('\n}', ',\n}')
     except:
@@ -159,7 +159,7 @@ else:
 
 shebang = ""
 if args.write_shebang:
-    shebang += f"""#!/usr/bin/env python3"
+    shebang += f"""#!/usr/bin/env python3
 import requests
 {args.session_variable} = requests.session()
 """
