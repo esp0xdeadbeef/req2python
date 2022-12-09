@@ -232,7 +232,8 @@ data = $data
 $response_var = $session_variable.$requests_method(
     $request_args
 )
-print($response_var.text)""")
+print($response_var.text)
+""")
 
 
 url = f"'{url}'"
