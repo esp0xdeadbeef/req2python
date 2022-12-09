@@ -153,7 +153,7 @@ if args.url_as_argument_without_path:
     ## inside request:
     # url=url + "/" + path/on/server
     url, path = ('/'.join(url.split('/')[:3]) + "/", '/'.join(url.split('/')[3:]))
-    variables_request_args['url'] = f"url + \"/\" + {path}"
+    variables_request_args['url'] = f"url + \"/{path}\""
 else:
     ## cat example.req | python3 req2python.py -request-proto http
     ## url variable:
