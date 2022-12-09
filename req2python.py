@@ -114,7 +114,7 @@ parser.add_argument(
 
 parser.add_argument(
     '-url-as-argument-without-path', 
-    action='store_true', 
+    action='store_false', 
     default=True,
     help='Remove content length (default: %(default)s)'
 )
@@ -149,10 +149,10 @@ variables_request_args = {
 if args.url_as_argument_without_path:
     ## cat example.req | python3 req2python.py -request-proto http -url-as-argument-without-path
     ## url variable:
-    # url = 'http://localhost:8000/'
+    # url = 'http://localhost:8000'
     ## inside request:
-    # url=url + "/" + path/on/server
-    url, path = ('/'.join(url.split('/')[:3]) + "/", '/'.join(url.split('/')[3:]))
+    # url=url + "/path/on/server"
+    url, path = ('/'.join(url.split('/')[:3]), '/'.join(url.split('/')[3:]))
     variables_request_args['url'] = f"url + \"/{path}\""
 else:
     ## cat example.req | python3 req2python.py -request-proto http
