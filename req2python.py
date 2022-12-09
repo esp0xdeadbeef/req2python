@@ -112,6 +112,13 @@ parser.add_argument(
     help='Remove content length (default: %(default)s)'
 )
 
+parser.add_argument(
+    '-url-as-argument-without-path', 
+    action='store_true', 
+    default=True,
+    help='Remove content length (default: %(default)s)'
+)
+
 args = parser.parse_args()
 method, url, headers, data, path, http_vsn_str, alert_request_proto = parse_request(args.infile)
 
@@ -127,18 +134,37 @@ for i in ['Content-Length', 'content-length']:
         pass
 
 
-
-requests_args = Template("""url=url, 
+requests_args = Template("""url=$url, 
     headers=headers,
     data=data,
     # proxies={
     #    'http': '$proxy_variable'
     # },
     # allow_redirects=False,""")
-a = {
+
+variables_request_args = {
     "proxy_variable": args.proxy_variable
 }
-requests_args = str(requests_args.substitute(a))
+
+if args.url_as_argument_without_path:
+    ## cat example.req | python3 req2python.py -request-proto http -url-as-argument-without-path
+    ## url variable:
+    # url = 'http://localhost:8000/'
+    ## inside request:
+    # url=url + "/" + path/on/server
+    url, path = ('/'.join(url.split('/')[:3]) + "/", '/'.join(url.split('/')[3:]))
+    variables_request_args['url'] = f"url + \"/\" + {path}"
+else:
+    ## cat example.req | python3 req2python.py -request-proto http
+    ## url variable:
+    # url = 'http://localhost:8000/testing'
+    ## inside request:
+    # url=url
+    variables_request_args['url'] = "url"
+
+
+
+requests_args = str(requests_args.substitute(variables_request_args))
 
 if args.pretty_json:
     try:
@@ -173,6 +199,8 @@ if args.write_shebang:
 import requests
 {args.session_variable} = requests.session()
 """
+
+
 if args.make_url_argparse:
     url_from_argparse = f"""import argparse
 parser = argparse.ArgumentParser()
