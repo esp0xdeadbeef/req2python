@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from http.server import BaseHTTPRequestHandler
+from io import BytesIO
 import argparse
 from string import Template
 import sys
@@ -11,110 +13,139 @@ def read_stdin_or_file(infile_object):
     if 'bytes' in str(type(raw_in_file)):
         return raw_in_file
     return raw_in_file.encode()
-     
+
+
+class HTTPRequest(BaseHTTPRequestHandler):
+    def __init__(self, request_text):
+        self.rfile = BytesIO(request_text)
+        self.raw_requestline = self.rfile.readline()
+        self.error_code = self.error_message = None
+        self.parse_request()  # This method automatically parses the request
+
+    def send_error(self, code, message):
+        """Override to prevent sending errors to a client."""
+        self.error_code = code
+        self.error_message = message
 
 def parse_request(infile_object):
+    """
+    Parse an HTTP request, extracting method, URL, headers, and data.
+    Allows HTTP/2 by converting it to HTTP/1.1.
+    """
+    # Read input from stdin or file
     in_file = read_stdin_or_file(infile_object)
-    splitted_req = in_file.split(b'\r\n\r\n', 1)
-    data = splitted_req[-1]
 
-    headers_with_method_row = splitted_req[0]
-    headers_raw = headers_with_method_row.split(b'\r\n')[1:]
-    headers = {}
-    for header in headers_raw:
-        current_header = header.decode('latin-1').split(':', 1)
-        headers[current_header[0].strip()] = current_header[1].strip()
-    method, path, http_vsn_str = headers_with_method_row.split(b'\r\n')[0].decode().split(' ')
-    
+    # Preprocess: Replace HTTP/2 with HTTP/1.1 (since BaseHTTPRequestHandler only supports HTTP/1.x)
+    in_file = in_file.replace(b"HTTP/2", b"HTTP/1.1")
+
+    # Parse using the HTTPRequest class
+    request = HTTPRequest(in_file)
+
+    # Handle parsing errors
+    if request.error_code is not None:
+        raise ValueError(f"Error in parsing request: {request.error_message}")
+
+    # Convert headers to a dictionary for easier modification
+    headers = dict(request.headers)
+
+    for header in ['Content-Length', 'content-length']:
+        headers.pop(header, None) 
+
+    # Build the URL from the headers and path
     try:
-        url = args.request_proto + '://' + headers['Host'] + path
+        url = f"{args.request_proto}://{headers['Host']}{request.path}"
     except KeyError:
-        url = path
-    
+        url = request.path
+
+    # Alert if any headers suggest a different protocol
     potential_proto_headers = ['Referer', 'Origin']
-    alert_request_proto = False
-    for potential_proto_header in potential_proto_headers:
-        try:
-            if headers[potential_proto_header].split(':',1)[0] != args.request_proto:
-                alert_request_proto = True
-                break
-        except KeyError:
-            pass
-    
-    return method, url, headers, data, path, http_vsn_str, alert_request_proto
+    alert_request_proto = any(
+        headers.get(header, '').split(':', 1)[0] != args.request_proto
+        for header in potential_proto_headers
+    )
+
+    return (
+        request.command,             # HTTP method (GET, POST, etc.)
+        url,                         # Full URL
+        headers,                     # Parsed headers (now a dict)
+        request.rfile.read(),        # Request body
+        request.path,                # The requested path
+        request.request_version,     # HTTP version (e.g., HTTP/1.1)
+        alert_request_proto          # Alert for protocol mismatches
+    )
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    'infile', 
+    'infile',
     nargs='?',
-    type=argparse.FileType('rb'), 
+    type=argparse.FileType('rb'),
     default=sys.stdin
 )
 parser.add_argument(
-    '-outfile', 
-    nargs='?', 
+    '-outfile',
+    nargs='?',
     type=argparse.FileType(
-        'a', 
+        'a',
         encoding='latin-1'
         ),
     default=sys.stdout,
     help="Append the request session to file instead of stdout",
 )
 parser.add_argument(
-    '-request-proto', 
-    nargs='?', 
-    type=str, 
+    '-request-proto',
+    nargs='?',
+    type=str,
     default="https",
     help='The request will be made with prototype (default: %(default)s)'
 )
 parser.add_argument(
-    '-session-variable', 
-    nargs='?', 
-    type=str, 
+    '-session-variable',
+    nargs='?',
+    type=str,
     default="s",
     help='Session variable (default: %(default)s)'
 )
 parser.add_argument(
-    '-proxy-variable', 
-    type=str, 
+    '-proxy-variable',
+    type=str,
     default="http://127.0.0.1:8080",
     help='Proxy variable in output (default: %(default)s)'
 )
 parser.add_argument(
     '-response-var',
-    type=str, 
+    type=str,
     default="r",
     help='Request result variable (default: %(default)s)'
 )
 parser.add_argument(
-    '-pretty-json', 
-    action='store_false', 
+    '-pretty-json',
+    action='store_false',
     default=True,
     help='Make the json pretty (default: %(default)s)'
 )
 parser.add_argument(
-    '-write-shebang', 
-    action='store_false', 
+    '-write-shebang',
+    action='store_false',
     default=True,
     help='Initialise the file with shebang, importing requests and session variable (default: %(default)s)'
 )
 parser.add_argument(
-    '-remove-content-length', 
-    action='store_false', 
+    '-remove-content-length',
+    action='store_false',
     default=True,
     help='Remove content length (default: %(default)s)'
 )
 parser.add_argument(
-    '-make-url-argparse', 
-    action='store_true', 
+    '-make-url-argparse',
+    action='store_true',
     default=False,
     help='Remove content length (default: %(default)s)'
 )
 
 parser.add_argument(
-    '-url-as-argument-without-path', 
-    action='store_false', 
+    '-url-as-argument-without-path',
+    action='store_false',
     default=True,
     help='Remove content length (default: %(default)s)'
 )
@@ -134,7 +165,7 @@ for i in ['Content-Length', 'content-length']:
         pass
 
 
-requests_args = Template("""url=$url, 
+requests_args = Template("""url=$url,
     headers=headers,
     data=data,
     # proxies={
@@ -147,22 +178,10 @@ variables_request_args = {
 }
 
 if args.url_as_argument_without_path:
-    ## cat example.req | python3 req2python.py -request-proto http -url-as-argument-without-path
-    ## url variable:
-    # url = 'http://localhost:8000'
-    ## inside request:
-    # url=url + "/path/on/server"
     url, path = ('/'.join(url.split('/')[:3]), '/'.join(url.split('/')[3:]))
     variables_request_args['url'] = f"url + \"/{path}\""
 else:
-    ## cat example.req | python3 req2python.py -request-proto http
-    ## url variable:
-    # url = 'http://localhost:8000/testing'
-    ## inside request:
-    # url=url
     variables_request_args['url'] = "url"
-
-
 
 requests_args = str(requests_args.substitute(variables_request_args))
 
@@ -206,7 +225,7 @@ if args.make_url_argparse:
 parser = argparse.ArgumentParser()
 parser.add_argument(
     '-url',
-    type=str, 
+    type=str,
     default="{url}",
     help='Request result variable (default: %(default)s)'
 )
@@ -247,7 +266,7 @@ variables = {
     'url': url,
     'session_variable': args.session_variable,
     'requests_method': requests_method,
-    'response_var': args.response_var, 
+    'response_var': args.response_var,
     'request_args': requests_args,
 }
 
