@@ -199,11 +199,27 @@ if args.pretty_json:
         json_data_type = False
 
 
-requests_methods = []
-with open(sysconfig.get_paths()["purelib"] + "/requests/api.py", 'r') as f:
-    for i in f.readlines():
-        if 'def ' in i and not 'request(' in i:
-            requests_methods.append(i.split('def ', 1)[-1].split('(',1)[0])
+#requests_methods = []
+#with open(sysconfig.get_paths()["purelib"] + "/requests/api.py", 'r') as f:
+#    for i in f.readlines():
+#        if 'def ' in i and not 'request(' in i:
+#            requests_methods.append(i.split('def ', 1)[-1].split('(',1)[0])
+#import requests.api as _api
+
+#requests_methods = [name for name in _api.__all__ if name != "request"]
+import inspect
+import requests.api as _api     # sub-module that defines the helpers
+
+requests_methods = [
+    name
+    for name, obj in inspect.getmembers(_api, inspect.isfunction)
+    if obj.__module__ == _api.__name__ and name != "request"
+]
+
+print(requests_methods)
+# → ['get', 'post', 'put', 'patch', 'delete', 'head', 'options']
+
+
 
 if method.lower() in requests_methods:
     requests_method = method.lower()
